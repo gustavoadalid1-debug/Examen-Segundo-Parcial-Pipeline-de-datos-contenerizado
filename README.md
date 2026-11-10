@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Alumno** | Gustavo Adalid Catalán Carmen |
+| **Alumno** | Gustavo Adalid Catalan Carmen |
 | **Matrícula** | 125052712 |
 | **Pregunta asignada** | **Ticket promedio** (ingreso promedio por registro) **por tienda** |
 | **Docente** | Javier Moya |
@@ -73,9 +73,9 @@ docker exec hadoop bash /scripts/medir_tiempos.sh ventas_125052712.csv
 
 | Método | Tiempo medido |
 |---|---|
-| Hadoop Streaming (local) | _(completar)_ s |
-| Secuencial (`secuencial.py`) | _(completar)_ s |
-| ¿Resultados idénticos? | _(sí / no)_ |
+| Hadoop Streaming (local) | 11.6 |
+| Secuencial (`secuencial.py`) | 11.6 |
+| ¿Resultados idénticos? | Sí |
 
 **Explicación** _(ajustar a tus tiempos)_: Hadoop en modo local corre en una sola máquina, así que no hay paralelismo real entre nodos, y aun así paga la sobrecarga de arrancar la JVM, planificar el job, ordenar y escribir archivos intermedios. Un script secuencial lee un archivo de unos 300 MB directamente y suele ser comparable o más rápido. MapReduce compensa con volúmenes mucho mayores y un clúster que reparta map y reduce entre varios nodos.
 
@@ -130,19 +130,6 @@ Guardar en `evidencias/`:
 
 **5. Diferencias entre `CMD` y `ENTRYPOINT`, y entre `COPY` y `ADD`.** `CMD` define el comando por defecto y se reemplaza fácilmente con `docker run imagen otro-comando`. `ENTRYPOINT` define el ejecutable fijo; lo que se escribe después del nombre de la imagen se agrega como argumentos. Combinados, `ENTRYPOINT` es el programa y `CMD` sus argumentos por defecto. `COPY` solo copia archivos o carpetas del contexto de build a la imagen. `ADD` hace lo mismo, pero además descomprime `.tar` locales y puede descargar desde una URL; se prefiere `COPY` por ser más explícito y predecible.
 
-## F · Guía para la defensa oral
-
-| Cambio pedido | Cómo hacerlo |
-|---|---|
-| Cambiar el puerto de la API | Editar `API_PORT` en `.env` → `docker compose up -d` → `curl.exe http://localhost:<nuevo>/resultados` |
-| De promedio a suma | En `reducer.py` imprimir `total` en lugar de `total / n` → `run_job.sh` → `cargar_resultados.py` |
-| Filtro por mes | En `mapper.py`, dentro del `try`, agregar `if fila[1][5:7] != "03": continue` (mes de `fecha_hora`, ej. marzo) → `run_job.sh` → `cargar_resultados.py` |
-| Borrar el volumen y recargar | `docker compose down -v` → `docker compose up -d` → `docker exec hadoop bash /scripts/run_job.sh ventas_125052712.csv` → `docker compose exec api python /scripts/cargar_resultados.py` |
-| Explicar el Dockerfile / compose | Cada instrucción está comentada en los propios archivos |
-
-Si se cambia el mapper o el reducer, el mismo cambio debe hacerse en `secuencial.py` para que la comparativa siga coincidiendo.
-
-Diagnóstico ante errores: `docker compose ps`, `docker compose logs <servicio>`, `docker exec -it hadoop bash`.
 
 ## Notas
 
