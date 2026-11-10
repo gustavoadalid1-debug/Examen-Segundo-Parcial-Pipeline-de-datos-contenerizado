@@ -1,38 +1,39 @@
 #!/usr/bin/env python3
-"""MAPPER (Hadoop Streaming).
+"""MAPPER (Hadoop Streaming) — Ticket promedio por tienda.
 
-Lee el CSV por la entrada estándar y emite pares  clave<TAB>valor.
+Dataset ventas_125052712.csv (8 columnas):
+  0 id | 1 fecha_hora | 2 tienda | 3 categoria | 4 producto |
+  5 cantidad | 6 precio_unitario | 7 metodo_pago
 
->>> CAMBIA AQUÍ según tu pregunta asignada <<<
-  COL_CLAVE : índice (desde 0) de la columna por la que se agrupa
-  COL_VALOR : índice (desde 0) de la columna numérica que se agrega
-  (secuencial.py debe usar los MISMOS índices)
+Por cada registro emite:   tienda <TAB> cantidad * precio_unitario
+(el "ingreso" del registro). El reducer promedia esos ingresos por tienda.
 
 Manejo de errores:
-  - El encabezado se descarta: su valor no es numérico, así que float() falla.
-  - Filas cortas, vacías o con valor no numérico se ignoran (y se cuentan).
+  - El encabezado se descarta: "cantidad" no es numérico y float() falla.
+  - Filas cortas, vacías, sin tienda o con números inválidos se ignoran y se cuentan.
 """
 import csv
 import sys
 
-COL_CLAVE = 0
-COL_VALOR = 1
+COL_TIENDA = 2
+COL_CANTIDAD = 5
+COL_PRECIO = 6
 
 
 def main():
     descartadas = 0
     for fila in csv.reader(sys.stdin):
         try:
-            clave = fila[COL_CLAVE].strip()
-            valor = float(fila[COL_VALOR])
-            if not clave:
-                raise ValueError("clave vacía")
+            tienda = fila[COL_TIENDA].strip()
+            ingreso = float(fila[COL_CANTIDAD]) * float(fila[COL_PRECIO])
+            if not tienda:
+                raise ValueError("tienda vacía")
         except (IndexError, ValueError):
             descartadas += 1  # encabezado, fila rota o valor no numérico
             continue
-        print(f"{clave}\t{valor}")
+        print(f"{tienda}\t{ingreso}")
 
-    # Contador visible en la salida de Hadoop (cuenta encabezado + filas malas)
+    # Contador visible en la salida de Hadoop (incluye el encabezado)
     print(f"reporter:counter:Calidad,FilasDescartadas,{descartadas}", file=sys.stderr)
 
 

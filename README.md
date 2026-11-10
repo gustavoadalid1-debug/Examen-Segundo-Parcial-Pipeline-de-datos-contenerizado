@@ -4,18 +4,25 @@
 |---|---|
 | **Alumno** | Gustavo Adalid Catalán Carmen |
 | **Matrícula** | 125052712 |
-| **Pregunta asignada** | _(PENDIENTE: pegar aquí el enunciado de tu pregunta de MapReduce)_ |
+| **Pregunta asignada** | **Ticket promedio** (ingreso promedio por registro) **por tienda** |
 | **Docente** | Javier Moya |
+
+**Dataset:** `ventas_125052712.csv` — 5,000,000 filas × 8 columnas (≈ 336 MB): `id, fecha_hora, tienda, categoria, producto, cantidad, precio_unitario, metodo_pago`. No se sube al repositorio (`*.csv` está en `.gitignore`).
+
+**Definición usada:** el ingreso de cada registro es `cantidad × precio_unitario`; el ticket promedio de una tienda es la media de esos ingresos entre todos sus registros.
+
+- **Mapper:** emite `tienda <TAB> cantidad × precio_unitario` y descarta el encabezado y las filas inválidas.
+- **Reducer:** recibe las líneas ordenadas por tienda y calcula `suma / conteo` por tienda.
 
 ## Arquitectura
 
 ```
- ./data/*.csv ──► [hadoop]  Hadoop Streaming (mapper.py + reducer.py)
-                     │            └── escribe results/salida/part-00000
-                     ▼
-              scripts/cargar_resultados.py ──► [db] PostgreSQL (volumen pgdata)
-                                                   ▲
-                                         [api] Flask  (GET / POST / DELETE)
+ ./data/ventas_125052712.csv ──► [hadoop]  Hadoop Streaming (mapper.py + reducer.py)
+                                    │            └── escribe results/salida/part-00000
+                                    ▼
+                  scripts/cargar_resultados.py ──► [db] PostgreSQL (volumen pgdata)
+                                                       ▲
+                                             [api] Flask  (GET / POST / DELETE)
 ```
 
 Servicios de `docker-compose.yml`: `hadoop`, `db`, `api` (red `pipeline`, volumen nombrado `pgdata`, variables en `.env`, `depends_on` con healthcheck). El servicio `hadoop2` solo existe bajo el perfil `ssh` para demostrar SSH entre contenedores.
@@ -27,7 +34,7 @@ git clone https://github.com/gustavoadalid1-debug/Examen-Segundo-Parcial-Pipelin
 cd Examen-Segundo-Parcial-Pipeline-de-datos-contenerizado
 
 copy .env.example .env          # edita .env y cambia la contraseña
-# copia tu CSV a la carpeta data\   (los .csv NO se suben al repo)
+# copia ventas_125052712.csv a la carpeta data\
 
 docker compose up --build -d
 docker compose ps
@@ -53,15 +60,15 @@ No pide contraseña: la llave RSA se genera sin passphrase en el `Dockerfile` y 
 ### C1 · Job MapReduce
 
 ```powershell
-docker exec hadoop bash /scripts/run_job.sh <archivo>.csv
+docker exec hadoop bash /scripts/run_job.sh ventas_125052712.csv
 ```
 
-La salida queda en `results/salida/part-00000` (formato `clave<TAB>valor`).
+La salida queda en `results/salida/part-00000` (formato `tienda<TAB>ticket_promedio`). Con 5 millones de filas puede tardar varios minutos.
 
 ### C2 · Comparativa Hadoop vs secuencial
 
 ```powershell
-docker exec hadoop bash /scripts/medir_tiempos.sh <archivo>.csv
+docker exec hadoop bash /scripts/medir_tiempos.sh ventas_125052712.csv
 ```
 
 | Método | Tiempo medido |
@@ -70,7 +77,7 @@ docker exec hadoop bash /scripts/medir_tiempos.sh <archivo>.csv
 | Secuencial (`secuencial.py`) | _(completar)_ s |
 | ¿Resultados idénticos? | _(sí / no)_ |
 
-**Explicación** _(completar con tus tiempos)_: con un dataset pequeño o mediano, Hadoop suele ser más lento porque arrancar la JVM, planificar el job y escribir archivos intermedios cuesta varios segundos; esa sobrecarga solo se compensa con volúmenes grandes y un clúster real que paralelice map y reduce en varios nodos. El modo local usado aquí ejecuta todo en una sola máquina, así que no hay ganancia por paralelismo.
+**Explicación** _(ajustar a tus tiempos)_: Hadoop en modo local corre en una sola máquina, así que no hay paralelismo real entre nodos, y aun así paga la sobrecarga de arrancar la JVM, planificar el job, ordenar y escribir archivos intermedios. Un script secuencial lee un archivo de unos 300 MB directamente y suele ser comparable o más rápido. MapReduce compensa con volúmenes mucho mayores y un clúster que reparta map y reduce entre varios nodos.
 
 ### D · Integración con la API y persistencia
 
@@ -79,9 +86,9 @@ docker compose exec api python /scripts/cargar_resultados.py
 
 curl.exe http://localhost:8000/health
 curl.exe http://localhost:8000/resultados
-curl.exe http://localhost:8000/resultados/<clave>
-curl.exe -X POST http://localhost:8000/resultados -H "Content-Type: application/json" -d "{\"clave\":\"prueba\",\"valor\":1}"
-curl.exe -X DELETE http://localhost:8000/resultados/prueba
+curl.exe http://localhost:8000/resultados/T013
+curl.exe -X POST http://localhost:8000/resultados -H "Content-Type: application/json" -d "{\"clave\":\"T999\",\"valor\":1}"
+curl.exe -X DELETE http://localhost:8000/resultados/T999
 ```
 
 **Persistencia:**
@@ -105,21 +112,27 @@ Guardar en `evidencias/`:
 
 ## E · Teoría
 
-**1. Diferencia entre `CMD` y `ENTRYPOINT`, y entre `COPY` y `ADD`.**
+**1. Modos de Hadoop y uso de HDFS.** En el modo *standalone* (local) todo corre en un solo proceso Java, sin demonios, y lee y escribe en el sistema de archivos local; sirve para pruebas y depuración. En el *pseudo-distribuido* los demonios (NameNode, DataNode, ResourceManager, NodeManager) corren en una misma máquina como procesos separados, simulando un clúster pequeño. En el *totalmente distribuido* esos demonios se reparten en varios nodos reales, y HDFS replica los bloques entre ellos para escalar y tolerar fallas. HDFS se usa en el pseudo-distribuido y en el totalmente distribuido, pero no en el standalone.
 
-- `CMD` define el comando por defecto del contenedor y se reemplaza fácilmente: `docker run imagen otro-comando` lo sustituye. `ENTRYPOINT` define el ejecutable fijo; lo que se escribe después del nombre de la imagen se agrega como argumentos. Combinados, `ENTRYPOINT` es el programa y `CMD` sus argumentos por defecto.
-- `COPY` solo copia archivos o carpetas del contexto de construcción a la imagen. `ADD` hace lo mismo, pero además descomprime `.tar` locales y puede descargar desde una URL. Se prefiere `COPY` por ser explícito y predecible.
+**2. ¿Por qué el dataset se monta como volumen y no con `COPY`?** (1) El CSV pesa unos 336 MB: copiarlo a la imagen la infla y hace lentos el build, el push y el pull de cada versión. (2) Datos y código deben estar separados: si cambia el CSV no hay que reconstruir la imagen, y la misma imagen sirve para cualquier dataset. (3) El CSV no debe viajar con la imagen ni con el repositorio (privacidad y la penalización por subirlo), mientras que un volumen lo deja solo en la máquina local. (4) El volumen se comparte entre contenedores sin duplicar el archivo.
 
-_(PENDIENTE: agregar las demás preguntas de teoría del examen y sus respuestas.)_
+**3. `docker compose down` vs `docker compose down -v`.** `down` elimina contenedores y red, pero conserva los volúmenes nombrados, así que los datos de la base de datos (`pgdata`) siguen ahí al volver a levantar. `down -v` elimina además los volúmenes nombrados: la base de datos se pierde por completo y hay que volver a cargar los resultados con `cargar_resultados.py`.
+
+**4. ¿Por qué MapReduce no siempre es más rápido que un script secuencial con 400 MB?** Porque tiene costos fijos: arrancar la JVM, planificar el job, serializar, ordenar y mezclar (shuffle) y escribir resultados intermedios a disco. Con 400 MB y una sola máquina no hay paralelismo real, y un script secuencial lee ese archivo en pocos segundos. Conviene cuando los datos son de varios GB o TB y no caben en memoria o tardarían demasiado, cuando hay un clúster con varios nodos que paralelicen map y reduce, y cuando la tarea se puede dividir en partes independientes y se necesita tolerancia a fallos.
+
+**5. Diferencias entre `CMD` y `ENTRYPOINT`, y entre `COPY` y `ADD`.** `CMD` define el comando por defecto y se reemplaza fácilmente con `docker run imagen otro-comando`. `ENTRYPOINT` define el ejecutable fijo; lo que se escribe después del nombre de la imagen se agrega como argumentos. Combinados, `ENTRYPOINT` es el programa y `CMD` sus argumentos por defecto. `COPY` solo copia archivos o carpetas del contexto de build a la imagen. `ADD` hace lo mismo, pero además descomprime `.tar` locales y puede descargar desde una URL; se prefiere `COPY` por ser más explícito y predecible.
 
 ## F · Guía para la defensa oral
 
 | Cambio pedido | Cómo hacerlo |
 |---|---|
 | Cambiar el puerto de la API | Editar `API_PORT` en `.env` → `docker compose up -d` → `curl.exe http://localhost:<nuevo>/resultados` |
-| Otra agregación (promedio / filtro por mes) | Editar `mapper.py` (filtro con un `if`) y `reducer.py` (ver el docstring para promedio) → `run_job.sh` → `cargar_resultados.py` |
-| Borrar el volumen y recargar | `docker compose down -v` → `docker compose up -d` → `docker exec hadoop bash /scripts/run_job.sh <csv>` → `docker compose exec api python /scripts/cargar_resultados.py` |
+| De promedio a suma | En `reducer.py` imprimir `total` en lugar de `total / n` → `run_job.sh` → `cargar_resultados.py` |
+| Filtro por mes | En `mapper.py`, dentro del `try`, agregar `if fila[1][5:7] != "03": continue` (mes de `fecha_hora`, ej. marzo) → `run_job.sh` → `cargar_resultados.py` |
+| Borrar el volumen y recargar | `docker compose down -v` → `docker compose up -d` → `docker exec hadoop bash /scripts/run_job.sh ventas_125052712.csv` → `docker compose exec api python /scripts/cargar_resultados.py` |
 | Explicar el Dockerfile / compose | Cada instrucción está comentada en los propios archivos |
+
+Si se cambia el mapper o el reducer, el mismo cambio debe hacerse en `secuencial.py` para que la comparativa siga coincidiendo.
 
 Diagnóstico ante errores: `docker compose ps`, `docker compose logs <servicio>`, `docker exec -it hadoop bash`.
 

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""REDUCER (Hadoop Streaming).
+"""REDUCER (Hadoop Streaming) — Ticket promedio por tienda.
 
-Recibe líneas  clave<TAB>valor  YA ORDENADAS por clave (Hadoop hace el sort
-entre map y reduce) y suma los valores de cada clave.
+Recibe líneas  tienda<TAB>ingreso  YA ORDENADAS por tienda (Hadoop hace el sort
+entre map y reduce). Para cada tienda lleva la suma y el conteo, y al cambiar de
+tienda imprime  tienda<TAB>promedio.
 
-Para pasar de SUMA a PROMEDIO (defensa oral):
-  1) lleva también un contador:   total, n = 0.0, 0
-  2) en cada línea:               total += valor; n += 1
-  3) al imprimir:                 print(f"{actual}\t{total / n:.2f}")
+Para pasar de PROMEDIO a SUMA (defensa oral): imprime `total` en vez de `total / n`.
 """
 import sys
 
@@ -15,22 +13,24 @@ import sys
 def main():
     actual = None
     total = 0.0
+    n = 0
 
     for linea in sys.stdin:
         try:
-            clave, valor = linea.rstrip("\n").split("\t")
-            valor = float(valor)
+            tienda, ingreso = linea.rstrip("\n").split("\t")
+            ingreso = float(ingreso)
         except ValueError:
             continue  # línea mal formada: se ignora
 
-        if clave != actual:
+        if tienda != actual:
             if actual is not None:
-                print(f"{actual}\t{total:.2f}")
-            actual, total = clave, 0.0
-        total += valor
+                print(f"{actual}\t{total / n:.2f}")
+            actual, total, n = tienda, 0.0, 0
+        total += ingreso
+        n += 1
 
     if actual is not None:
-        print(f"{actual}\t{total:.2f}")
+        print(f"{actual}\t{total / n:.2f}")
 
 
 if __name__ == "__main__":
