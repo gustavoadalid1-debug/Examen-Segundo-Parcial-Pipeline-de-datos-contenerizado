@@ -1,0 +1,13 @@
+# Datos: nunca subir CSV (penalización -5)
+*.csv
+
+# Credenciales reales: nunca subir (penalización -5)
+.env
+
+# Salidas del job (se regeneran)
+results/*
+!results/.gitkeep
+
+# Python
+__pycache__/
+*.pyc

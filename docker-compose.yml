@@ -1,0 +1,60 @@
+services:
+  # 1) Hadoop: ejecuta el job MapReduce (Hadoop Streaming) y expone SSH
+  hadoop:
+    build: ./hadoop
+    container_name: hadoop
+    hostname: hadoop
+    volumes:
+      - ./data:/data              # aquí va el CSV (no se sube al repo)
+      - ./mapreduce:/mapreduce    # mapper, reducer y secuencial
+      - ./scripts:/scripts
+      - ./results:/results        # salida del job
+    networks:
+      - pipeline
+
+  # 2) Base de datos PostgreSQL con volumen nombrado (persistencia)
+  db:
+    image: postgres:16
+    container_name: db
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - pipeline
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 3) API Flask: lee y escribe en la base de datos
+  api:
+    build: ./api
+    container_name: api
+    env_file: .env
+    ports:
+      - "${API_PORT}:5000"        # puerto del host : puerto del contenedor
+    volumes:
+      - ./scripts:/scripts
+      - ./results:/results
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - pipeline
+
+  # Solo para demostrar SSH entre contenedores. No arranca con "up" normal:
+  #   docker compose --profile ssh up -d hadoop2
+  hadoop2:
+    build: ./hadoop
+    container_name: hadoop2
+    hostname: hadoop2
+    profiles: ["ssh"]
+    networks:
+      - pipeline
+
+volumes:
+  pgdata:
+
+networks:
+  pipeline:

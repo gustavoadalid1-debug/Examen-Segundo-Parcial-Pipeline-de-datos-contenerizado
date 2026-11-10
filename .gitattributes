@@ -1,0 +1,6 @@
+# Fuerza saltos de línea LF: los scripts se ejecutan dentro de contenedores Linux.
+# Sin esto, Git en Windows los convierte a CRLF y fallan ("bad interpreter" / ^M).
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yml  text eol=lf
+Dockerfile text eol=lf
