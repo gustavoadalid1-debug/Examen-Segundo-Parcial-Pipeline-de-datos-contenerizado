@@ -107,16 +107,6 @@ docker compose up -d
 curl.exe http://localhost:8000/resultados    # los datos siguen ahí
 ```
 
-## Evidencias
-
-Guardar en `evidencias/`:
-
-- [ ] `hadoop version`
-- [ ] `ssh localhost` y SSH entre contenedores sin contraseña
-- [ ] Salida del job (`run_job.sh`)
-- [ ] Comparativa de tiempos (`medir_tiempos.sh`)
-- [ ] Respuesta de la API (`GET /resultados`)
-- [ ] Persistencia tras `docker compose down` y `up`
 
 ## E · Teoría
 
