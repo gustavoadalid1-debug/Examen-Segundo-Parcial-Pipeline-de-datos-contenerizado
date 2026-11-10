@@ -87,9 +87,17 @@ docker compose exec api python /scripts/cargar_resultados.py
 curl.exe http://localhost:8000/health
 curl.exe http://localhost:8000/resultados
 curl.exe http://localhost:8000/resultados/T013
-curl.exe -X POST http://localhost:8000/resultados -H "Content-Type: application/json" -d "{\"clave\":\"T999\",\"valor\":1}"
-curl.exe -X DELETE http://localhost:8000/resultados/T999
 ```
+
+Escritura (POST) y borrado (DELETE). En PowerShell, `Invoke-RestMethod` evita los problemas de comillas de `curl.exe`:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/resultados -ContentType "application/json" -Body '{"clave":"T999","valor":1}'
+curl.exe http://localhost:8000/resultados/T999
+Invoke-RestMethod -Method Delete -Uri http://localhost:8000/resultados/T999
+```
+
+(Equivalente en Linux/Mac o Git Bash: `curl -X POST http://localhost:8000/resultados -H "Content-Type: application/json" -d '{"clave":"T999","valor":1}'`.)
 
 **Persistencia:**
 
